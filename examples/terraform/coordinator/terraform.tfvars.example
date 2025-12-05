@@ -28,7 +28,7 @@ max_vcpus    = 16
 # min_vcpus      = 0
 
 # Coordinator container settings
-coordinator_image  = "radusuciu/snakemake-executor-plugin-aws-basic-batch"
+coordinator_image  = "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch"
 coordinator_vcpus  = 1
 coordinator_memory = 2048
 

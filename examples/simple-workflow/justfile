@@ -1,6 +1,6 @@
 # Simple Workflow Example
-# Requires the base image (radusuciu/snakemake-executor-plugin-aws-basic-batch) to be available
-# either from Docker Hub or built locally via `just build-base` from the project root.
+# Requires the base image (ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch) to be available
+# either from GHCR or built locally via `just build-base` from the project root.
 
 coordinator_tf_dir := "../terraform/coordinator"
 workflow_tf_dir := "../terraform/simple-workflow"
