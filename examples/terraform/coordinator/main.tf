@@ -128,9 +128,9 @@ variable "max_vcpus" {
 }
 
 variable "coordinator_image" {
-  description = "Container image for coordinator job definition"
+  description = "Container image for coordinator job definition. If null and create_ecr=true, uses the created ECR repository with :latest tag."
   type        = string
-  default     = "snakemake/snakemake:latest"
+  default     = null
 }
 
 variable "coordinator_vcpus" {
@@ -209,6 +209,13 @@ locals {
   ))
 
   ecr_repository_url = var.create_ecr ? aws_ecr_repository.coordinator[0].repository_url : null
+
+  # Coordinator image: use provided value, or ECR repo if created, or fallback to GHCR
+  coordinator_image = coalesce(
+    var.coordinator_image,
+    var.create_ecr ? "${aws_ecr_repository.coordinator[0].repository_url}:latest" : null,
+    "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch:latest"
+  )
 }
 
 # =============================================================================
@@ -650,7 +657,7 @@ resource "aws_batch_job_definition" "coordinator" {
   propagate_tags        = true
 
   container_properties = jsonencode({
-    image = var.coordinator_image
+    image = local.coordinator_image
 
     resourceRequirements = [
       { type = "VCPU", value = tostring(var.coordinator_vcpus) },
@@ -764,4 +771,9 @@ output "ecr_repository_url" {
 output "ecr_repository_arn" {
   description = "ECR repository ARN"
   value       = var.create_ecr ? aws_ecr_repository.coordinator[0].arn : null
+}
+
+output "coordinator_image" {
+  description = "Resolved coordinator container image"
+  value       = local.coordinator_image
 }

@@ -28,7 +28,10 @@ max_vcpus    = 16
 # min_vcpus      = 0
 
 # Coordinator container settings
-coordinator_image  = "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch"
+# When create_ecr=true (default), the job definition automatically uses the created ECR repo.
+# Push the image with: just ecr-login && just push-ecr
+# To override with a custom image, uncomment:
+# coordinator_image = "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch:latest"
 coordinator_vcpus  = 1
 coordinator_memory = 2048
 
