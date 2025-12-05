@@ -1,21 +1,21 @@
 # Snakemake AWS Basic Batch Executor Plugin
 
 # Configuration
-base_image := "radusuciu/snakemake-executor-plugin-aws-basic-batch"
+base_image := "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch"
 tf_coordinator := "examples/terraform/coordinator"
 
 # Import example workflow module
 mod example 'examples/simple-workflow'
 
 # =============================================================================
-# Base Plugin Image (for docker.io)
+# Base Plugin Image (for ghcr.io)
 # =============================================================================
 
 # Build the base plugin image
 build-base:
     docker build -t {{base_image}}:latest .
 
-# Push the base plugin image to Docker Hub
+# Push the base plugin image to GHCR
 push-base:
     docker push {{base_image}}:latest
 
