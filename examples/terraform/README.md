@@ -36,8 +36,12 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your values
 terraform apply
 
-# 2. Deploy workflow infrastructure (from examples/simple-workflow directory)
-cd ../../simple-workflow
+# 2. Push coordinator image to ECR (from repo root)
+cd ../../..
+just ecr-login && just push-ecr
+
+# 3. Deploy workflow infrastructure (from examples/simple-workflow directory)
+cd examples/simple-workflow
 just tf-init
 just tf-apply-new
 ```
@@ -76,7 +80,7 @@ The workflow module receives coordinator outputs via CLI variables (handled by t
 | `instance_types` | EC2 instance types (only for EC2/SPOT) | `["optimal"]` |
 | `min_vcpus` | Min vCPUs for compute env (only for EC2/SPOT) | `0` |
 | `max_vcpus` | Max vCPUs for compute environment | `16` |
-| `coordinator_image` | Coordinator container image | `snakemake/snakemake:latest` |
+| `coordinator_image` | Coordinator container image (auto-uses ECR if `create_ecr=true` and null) | `null` |
 | `coordinator_vcpus` | vCPUs for coordinator job | `1` |
 | `coordinator_memory` | Memory (MiB) for coordinator job | `2048` |
 | **Storage** | | |

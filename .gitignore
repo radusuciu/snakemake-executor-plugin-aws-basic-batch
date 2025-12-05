@@ -5,6 +5,7 @@
 examples/simple-workflow/.snakemake/
 examples/terraform/**/.terraform/
 examples/terraform/*/terraform.tfvars
+examples/terraform/*/terraform.tfstate
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
