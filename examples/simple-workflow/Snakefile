@@ -1,0 +1,75 @@
+# Simple example workflow for testing snakemake-executor-plugin-aws-basic-batch
+#
+# This workflow:
+# 1. Creates sample input files
+# 2. Processes them in parallel on AWS Batch
+# 3. Aggregates results
+#
+# Run locally (for testing):
+#   snakemake --cores 1
+#
+# Run on AWS Batch:
+#   snakemake --executor aws-basic-batch \
+#     --aws-basic-batch-region <region> \
+#     --aws-basic-batch-job-queue <queue-name> \
+#     --aws-basic-batch-job-definition <job-def-name> \
+#     --default-storage-provider s3 \
+#     --default-storage-prefix s3://<your-bucket>/workflow
+
+SAMPLES = ["sample_A", "sample_B", "sample_C"]
+
+
+rule all:
+    input:
+        "results/summary.txt",
+
+
+rule create_input:
+    """Generate sample input data."""
+    output:
+        "data/{sample}.txt",
+    shell:
+        """
+        echo "Input data for {wildcards.sample}" > {output}
+        echo "Generated at: $(date)" >> {output}
+        echo "Hostname: $(hostname)" >> {output}
+        """
+
+
+rule process:
+    """Process each sample (runs on AWS Batch in parallel)."""
+    input:
+        "data/{sample}.txt",
+    output:
+        "results/{sample}.processed.txt",
+    shell:
+        """
+        echo "=== Processing {wildcards.sample} ===" > {output}
+        echo "Started at: $(date)" >> {output}
+        echo "Running on: $(hostname)" >> {output}
+        echo "" >> {output}
+        echo "Input contents:" >> {output}
+        cat {input} >> {output}
+        echo "" >> {output}
+        echo "Processing complete at: $(date)" >> {output}
+        """
+
+
+rule aggregate:
+    """Combine all processed results."""
+    input:
+        expand("results/{sample}.processed.txt", sample=SAMPLES),
+    output:
+        "results/summary.txt",
+    shell:
+        """
+        echo "=== Workflow Summary ===" > {output}
+        echo "Generated at: $(date)" >> {output}
+        echo "Total samples processed: {params}" >> {output}
+        echo "" >> {output}
+        for f in {input}; do
+            echo "--- $f ---" >> {output}
+            cat "$f" >> {output}
+            echo "" >> {output}
+        done
+        """

@@ -1,0 +1,32 @@
+[project]
+name = "snakemake-executor-plugin-aws-basic-batch"
+requires-python = ">=3.11,<4.0"
+version = "0.1.0"
+dependencies = [
+    "snakemake-interface-common>=1.22.0,<2",
+    "snakemake-interface-executor-plugins>=9.3.9,<10",
+    "boto3>=1.26.0",
+    "snakemake-storage-plugin-s3>=0.3.6",
+    "snakemake>=9.14.0",
+]
+
+[project.urls]
+Repository = "https://github.com/radusuciu/snakemake-executor-plugin-aws-basic-batch"
+
+[[project.authors]]
+name = "Radu Suciu"
+email = "radusuciu@gmail.com"
+
+[dependency-groups]
+dev = [
+ "ruff",
+ "coverage",
+ "pytest",
+ "twine",
+ "build",
+ "rust-just>=1.43.1",
+]
+
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling",]

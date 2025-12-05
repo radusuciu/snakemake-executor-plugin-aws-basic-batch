@@ -1,0 +1,40 @@
+# Coordinator infrastructure configuration
+# Copy to terraform.tfvars and edit with your values
+
+name_prefix = "snakemake-coordinator"
+region      = "us-east-1"
+
+# S3 bucket for workflow storage (must be globally unique)
+bucket_name = "CHANGEME-your-unique-bucket-name"
+
+# VPC settings - create new or use existing
+create_vpc = true
+vpc_cidr   = "10.0.0.0/16"
+
+# To use an existing VPC instead:
+# create_vpc = false
+# vpc_id     = "vpc-xxxxxxxxx"
+# subnet_ids = [
+#   "subnet-xxxxxxxxx",
+#   "subnet-yyyyyyyyy",
+# ]
+
+# Compute settings
+compute_type = "EC2"  # "FARGATE", "FARGATE_SPOT", "EC2", "SPOT"
+max_vcpus    = 16
+
+# For EC2/SPOT compute types:
+# instance_types = ["optimal"]
+# min_vcpus      = 0
+
+# Coordinator container settings
+coordinator_image  = "radusuciu/snakemake-executor-plugin-aws-basic-batch"
+coordinator_vcpus  = 1
+coordinator_memory = 2048
+
+# ECR repository for coordinator image
+create_ecr = true
+
+tags = {
+  Environment = "dev"
+}

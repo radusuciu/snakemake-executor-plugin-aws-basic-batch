@@ -1,0 +1,24 @@
+# Simple workflow configuration
+# Copy to terraform.tfvars and edit with your values
+#
+# Prerequisites:
+# - Deploy coordinator module first
+# - Coordinator outputs are passed via CLI (see justfile tf-with-coordinator-vars)
+
+name_prefix = "snakemake-simple-workflow"
+region      = "us-east-1"
+
+# Compute settings (must match coordinator)
+compute_type = "EC2"
+
+# Workflow container settings
+workflow_image  = "snakemake/snakemake:latest"  # Or your ECR image URL
+workflow_vcpus  = 1
+workflow_memory = 2048
+
+# ECR repository for workflow image
+create_ecr = true
+
+tags = {
+  Environment = "dev"
+}

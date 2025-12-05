@@ -1,0 +1,25 @@
+# Example Snakemake workflow using the AWS Basic Batch executor plugin.
+# Copy this as a starting point for your own workflow.
+#
+# Setup:
+#   uv sync
+#
+# Run locally (for testing):
+#   uv run snakemake --cores 1
+#
+# Run on AWS Batch:
+#   just run
+#   # or see justfile for the full snakemake command
+
+[project]
+name = "my-snakemake-workflow"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "snakemake>=9.14.0",
+    "snakemake-executor-plugin-aws-basic-batch",
+    "snakemake-storage-plugin-s3",
+]
+
+[dependency-groups]
+dev = ["rust-just"]
