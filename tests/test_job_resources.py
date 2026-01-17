@@ -1,6 +1,8 @@
 """Tests for AWS Batch job resource extraction."""
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from snakemake_executor_plugin_aws_basic_batch import Executor
 
 
