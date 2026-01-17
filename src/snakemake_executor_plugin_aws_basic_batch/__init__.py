@@ -103,7 +103,6 @@ class ExecutorSettings(ExecutorSettingsBase):
 common_settings = CommonSettings(
     non_local_exec=True,
     implies_no_shared_fs=True,
-    # We require the workflow to be included in the container image
     job_deploy_sources=False,
     pass_default_storage_provider_args=True,
     pass_default_resources_args=True,
@@ -144,10 +143,25 @@ class Executor(RemoteExecutor):
         """Build the coordinator command.
 
         The workflow is expected to be included in the container image.
-        We forward all original arguments - the COORDINATOR_CONTEXT_ENV_VAR
-        prevents recursion even if --coordinator is passed again.
+        We forward all original arguments except --snakefile (since the
+        Snakefile is in the container's working directory, not the local path).
+        The COORDINATOR_CONTEXT_ENV_VAR prevents recursion.
         """
-        return f"snakemake {shlex.join(sys.argv[1:])}"
+        # Filter out --snakefile and -s arguments since the path is local
+        args = sys.argv[1:]
+        filtered_args = []
+        skip_next = False
+        for arg in args:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg in ("--snakefile", "-s"):
+                skip_next = True  # Skip the next argument (the path)
+                continue
+            if arg.startswith("--snakefile=") or arg.startswith("-s="):
+                continue  # Skip --snakefile=path form
+            filtered_args.append(arg)
+        return f"snakemake {shlex.join(filtered_args)}"
 
     def _get_coordinator_environment(self) -> list:
         """Build environment variables for coordinator job."""

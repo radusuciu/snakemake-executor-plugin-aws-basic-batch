@@ -127,12 +127,6 @@ variable "max_vcpus" {
   default     = 16
 }
 
-variable "coordinator_image" {
-  description = "Container image for coordinator job definition. If null and create_ecr=true, uses the created ECR repository with :latest tag."
-  type        = string
-  default     = null
-}
-
 variable "coordinator_vcpus" {
   description = "vCPUs for coordinator job definition"
   type        = number
@@ -164,18 +158,6 @@ variable "s3_bucket_arns" {
   default     = []
 }
 
-# ECR Configuration
-variable "create_ecr" {
-  description = "Whether to create an ECR repository for the coordinator image"
-  type        = bool
-  default     = true
-}
-
-variable "ecr_repository_name" {
-  description = "ECR repository name. If null, uses name_prefix."
-  type        = string
-  default     = null
-}
 
 # =============================================================================
 # Locals
@@ -208,14 +190,6 @@ locals {
     var.s3_bucket_arns
   ))
 
-  ecr_repository_url = var.create_ecr ? aws_ecr_repository.coordinator[0].repository_url : null
-
-  # Coordinator image: use provided value, or ECR repo if created, or fallback to GHCR
-  coordinator_image = coalesce(
-    var.coordinator_image,
-    var.create_ecr ? "${aws_ecr_repository.coordinator[0].repository_url}:latest" : null,
-    "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch:latest"
-  )
 }
 
 # =============================================================================
@@ -346,48 +320,6 @@ resource "aws_s3_bucket_versioning" "workflow" {
   versioning_configuration {
     status = "Enabled"
   }
-}
-
-# =============================================================================
-# ECR Repository
-# =============================================================================
-
-resource "aws_ecr_repository" "coordinator" {
-  count = var.create_ecr ? 1 : 0
-
-  name                 = var.ecr_repository_name != null ? var.ecr_repository_name : "${var.name_prefix}-plugin"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = merge(local.common_tags, {
-    Name = var.ecr_repository_name != null ? var.ecr_repository_name : "${var.name_prefix}-plugin"
-  })
-}
-
-resource "aws_ecr_lifecycle_policy" "coordinator" {
-  count = var.create_ecr ? 1 : 0
-
-  repository = aws_ecr_repository.coordinator[0].name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 10 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 10
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
 }
 
 # =============================================================================
@@ -656,8 +588,10 @@ resource "aws_batch_job_definition" "coordinator" {
   platform_capabilities = local.is_fargate ? ["FARGATE"] : ["EC2"]
   propagate_tags        = true
 
+  # Note: The container image is overridden at job submission time by the workflow.
+  # Each workflow provides its own coordinator image with the Snakefile baked in.
   container_properties = jsonencode({
-    image = local.coordinator_image
+    image = "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch:latest"
 
     resourceRequirements = [
       { type = "VCPU", value = tostring(var.coordinator_vcpus) },
@@ -744,12 +678,12 @@ output "security_group_id" {
 # Storage outputs
 output "bucket_name" {
   description = "S3 bucket name for workflow storage"
-  value       = var.create_bucket ? aws_s3_bucket.workflow[0].id : null
+  value       = var.create_bucket ? aws_s3_bucket.workflow[0].id : var.bucket_name
 }
 
 output "bucket_arn" {
   description = "S3 bucket ARN for workflow storage"
-  value       = var.create_bucket ? aws_s3_bucket.workflow[0].arn : null
+  value       = var.create_bucket ? aws_s3_bucket.workflow[0].arn : (var.bucket_name != null ? "arn:aws:s3:::${var.bucket_name}" : null)
 }
 
 output "log_group_name" {
@@ -762,18 +696,3 @@ output "log_group_arn" {
   value       = aws_cloudwatch_log_group.batch.arn
 }
 
-# ECR outputs
-output "ecr_repository_url" {
-  description = "ECR repository URL for coordinator image"
-  value       = var.create_ecr ? aws_ecr_repository.coordinator[0].repository_url : null
-}
-
-output "ecr_repository_arn" {
-  description = "ECR repository ARN"
-  value       = var.create_ecr ? aws_ecr_repository.coordinator[0].arn : null
-}
-
-output "coordinator_image" {
-  description = "Resolved coordinator container image"
-  value       = local.coordinator_image
-}

@@ -19,31 +19,6 @@ build-base:
 push-ghcr: build-base
     docker push {{ghcr_image}}:latest
 
-# Get ECR repository URL from terraform output
-[private]
-ecr-url:
-    @terraform -chdir={{tf_coordinator}} output -raw ecr_repository_url
-
-# Tag and push to ECR (requires: aws ecr get-login-password | docker login)
-push-ecr: build-base
-    #!/usr/bin/env bash
-    set -euo pipefail
-    ecr_url=$(just ecr-url)
-    docker tag {{ghcr_image}}:latest "${ecr_url}:latest"
-    docker push "${ecr_url}:latest"
-
-# Push to both GHCR and ECR
-push-all: push-ghcr push-ecr
-
-# Login to ECR (run before push-ecr)
-ecr-login:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    region=$(terraform -chdir={{tf_coordinator}} output -raw region)
-    ecr_url=$(just ecr-url)
-    ecr_host="${ecr_url%%/*}"
-    aws ecr get-login-password --region "${region}" | docker login --username AWS --password-stdin "${ecr_host}"
-
 # =============================================================================
 # Terraform - Coordinator Infrastructure
 # =============================================================================

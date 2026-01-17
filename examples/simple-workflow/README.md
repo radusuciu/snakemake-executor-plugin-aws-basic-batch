@@ -24,36 +24,25 @@ terraform apply
 
 ### 2. Deploy Workflow Infrastructure
 
-The workflow module creates workflow-specific resources (job definition, ECR repository). It requires outputs from the coordinator:
+The workflow module creates workflow-specific resources (compute environment, job queue, job definition, ECR repositories for both workflow and coordinator images). It requires outputs from the coordinator:
 
 ```bash
-# From the simple-workflow example directory:
-just tf-init
-just tf-apply-new
-
-# Or manually:
-cd examples/terraform/simple-workflow
-terraform init
-terraform apply \
-  -var="job_queue_arn=$(terraform -chdir=../coordinator output -raw job_queue_arn)" \
-  -var="job_role_arn=$(terraform -chdir=../coordinator output -raw job_role_arn)" \
-  -var="execution_role_arn=$(terraform -chdir=../coordinator output -raw execution_role_arn)" \
-  -var="log_group_name=$(terraform -chdir=../coordinator output -raw log_group_name)" \
-  -var="log_group_arn=$(terraform -chdir=../coordinator output -raw log_group_arn)" \
-  -var="bucket_arn=$(terraform -chdir=../coordinator output -raw bucket_arn)"
+just example::tf-init
+just example::tf-apply-new
 ```
 
-### 3. Note the Outputs
+### 3. Build and Push Images
 
-After deployment, get the values needed for snakemake:
+Build and push both the coordinator and workflow images to ECR:
 
 ```bash
-# From examples/terraform/coordinator:
-terraform output  # region, job_queue_name, coordinator_job_definition_name, bucket_name
-
-# From examples/terraform/simple-workflow:
-terraform output  # job_definition_name
+just example::ecr-login
+just example::build-push
 ```
+
+This builds two images from the same Dockerfile:
+- **Coordinator image**: Base plugin image with workflow files (Snakefile)
+- **Workflow image**: Minimal image with workflow dependencies
 
 ## Running the Workflow
 
@@ -62,25 +51,23 @@ terraform output  # job_definition_name
 The justfile provides shortcuts for common operations:
 
 ```bash
-cd examples/simple-workflow
-
 # Submit coordinator job
-just run
+just example::run
 
 # Monitor job status
-just watch
+just example::watch
 
 # View logs
-just logs
+just example::logs
 
 # Check status
-just status
+just example::status
 ```
 
 Generate a snakemake command with your deployed infrastructure values:
 
 ```bash
-just tf-snakemake-cmd
+just example::tf-snakemake-cmd
 ```
 
 ### Option 1: Standard Mode (local orchestration)
@@ -105,8 +92,10 @@ snakemake --executor aws-basic-batch \
   --aws-basic-batch-region <region> \
   --aws-basic-batch-job-queue <queue-name> \
   --aws-basic-batch-job-definition <job-def-name> \
-  --aws-basic-batch-coordinator \
+  --aws-basic-batch-coordinator true \
   --aws-basic-batch-coordinator-job-definition <coordinator-job-def-name> \
+  --aws-basic-batch-coordinator-queue <coordinator-queue-name> \
+  --aws-basic-batch-coordinator-image <coordinator-image-uri> \
   --default-storage-provider s3 \
   --default-storage-prefix s3://<bucket-name>
 ```

@@ -1,2 +1,5 @@
 .snakemake/
 README.md
+justfile
+.last-job-id
+terraform/
