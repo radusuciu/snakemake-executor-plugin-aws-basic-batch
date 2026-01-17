@@ -2,7 +2,7 @@
 
 # Configuration
 ghcr_image := "ghcr.io/radusuciu/snakemake-executor-plugin-aws-basic-batch"
-tf_coordinator := "examples/terraform/coordinator"
+tf_dir := "examples/terraform"
 
 # Import example workflow module
 mod example 'examples/simple-workflow'
@@ -20,25 +20,25 @@ push-ghcr: build-base
     docker push {{ghcr_image}}:latest
 
 # =============================================================================
-# Terraform - Coordinator Infrastructure
+# Terraform - Infrastructure
 # =============================================================================
 
-# Initialize coordinator terraform
-tf-coordinator-init:
-    terraform -chdir={{tf_coordinator}} init
+# Initialize terraform
+tf-init:
+    terraform -chdir={{tf_dir}} init
 
-# Plan coordinator infrastructure
-tf-coordinator-plan *args:
-    terraform -chdir={{tf_coordinator}} plan {{args}}
+# Plan infrastructure
+tf-plan *args:
+    terraform -chdir={{tf_dir}} plan {{args}}
 
-# Apply coordinator infrastructure
-tf-coordinator-apply *args:
-    terraform -chdir={{tf_coordinator}} apply {{args}}
+# Apply infrastructure
+tf-apply *args:
+    terraform -chdir={{tf_dir}} apply {{args}}
 
-# Destroy coordinator infrastructure
-tf-coordinator-destroy *args:
-    terraform -chdir={{tf_coordinator}} destroy {{args}}
+# Destroy infrastructure
+tf-destroy *args:
+    terraform -chdir={{tf_dir}} destroy {{args}}
 
-# Show coordinator outputs
-tf-coordinator-output *args:
-    terraform -chdir={{tf_coordinator}} output {{args}}
+# Show terraform outputs
+tf-output *args:
+    terraform -chdir={{tf_dir}} output {{args}}

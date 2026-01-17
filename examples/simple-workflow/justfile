@@ -1,8 +1,7 @@
 # Simple Workflow Example
 # Both coordinator and workflow images are built from this Dockerfile and pushed to ECR.
 
-coordinator_tf_dir := "../terraform/coordinator"
-workflow_tf_dir := "../terraform/simple-workflow"
+tf_dir := "../terraform"
 
 # =============================================================================
 # Build and Push
@@ -12,14 +11,14 @@ workflow_tf_dir := "../terraform/simple-workflow"
 build-workflow:
     #!/usr/bin/env bash
     set -euo pipefail
-    workflow_ecr=$(terraform -chdir={{workflow_tf_dir}} output -raw ecr_repository_url)
+    workflow_ecr=$(terraform -chdir={{tf_dir}} output -raw workflow_ecr_repository_url)
     docker build --target runtime -t "$workflow_ecr:latest" .
 
 # Build the coordinator image (includes workflow files)
 build-coordinator:
     #!/usr/bin/env bash
     set -euo pipefail
-    coordinator_ecr=$(terraform -chdir={{workflow_tf_dir}} output -raw coordinator_ecr_repository_url)
+    coordinator_ecr=$(terraform -chdir={{tf_dir}} output -raw coordinator_ecr_repository_url)
     docker build --target coordinator -t "$coordinator_ecr:latest" .
 
 # Build both images
@@ -29,8 +28,8 @@ build: build-workflow build-coordinator
 ecr-login:
     #!/usr/bin/env bash
     set -euo pipefail
-    region=$(terraform -chdir={{coordinator_tf_dir}} output -raw region)
-    workflow_ecr=$(terraform -chdir={{workflow_tf_dir}} output -raw ecr_repository_url)
+    region=$(terraform -chdir={{tf_dir}} output -raw region)
+    workflow_ecr=$(terraform -chdir={{tf_dir}} output -raw workflow_ecr_repository_url)
     ecr_host="${workflow_ecr%%/*}"
     aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$ecr_host"
 
@@ -38,14 +37,14 @@ ecr-login:
 push-workflow: ecr-login
     #!/usr/bin/env bash
     set -euo pipefail
-    workflow_ecr=$(terraform -chdir={{workflow_tf_dir}} output -raw ecr_repository_url)
+    workflow_ecr=$(terraform -chdir={{tf_dir}} output -raw workflow_ecr_repository_url)
     docker push "$workflow_ecr:latest"
 
 # Push the coordinator image to ECR
 push-coordinator: ecr-login
     #!/usr/bin/env bash
     set -euo pipefail
-    coordinator_ecr=$(terraform -chdir={{workflow_tf_dir}} output -raw coordinator_ecr_repository_url)
+    coordinator_ecr=$(terraform -chdir={{tf_dir}} output -raw coordinator_ecr_repository_url)
     docker push "$coordinator_ecr:latest"
 
 # Push both images to ECR
@@ -65,21 +64,21 @@ workflow_dir := justfile_directory()
 run *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    region=$(terraform -chdir={{coordinator_tf_dir}} output -raw region)
-    coordinator_job_queue=$(terraform -chdir={{coordinator_tf_dir}} output -raw job_queue_name)
-    bucket=$(terraform -chdir={{coordinator_tf_dir}} output -raw bucket_name)
-    workflow_job_queue=$(terraform -chdir={{workflow_tf_dir}} output -raw job_queue_name)
-    workflow_job_def=$(terraform -chdir={{workflow_tf_dir}} output -raw job_definition_name)
-    coordinator_job_def=$(terraform -chdir={{workflow_tf_dir}} output -raw coordinator_job_definition_name)
+    region=$(terraform -chdir={{tf_dir}} output -raw region)
+    coordinator_queue=$(terraform -chdir={{tf_dir}} output -raw coordinator_job_queue_name)
+    workflow_queue=$(terraform -chdir={{tf_dir}} output -raw workflow_job_queue_name)
+    bucket=$(terraform -chdir={{tf_dir}} output -raw bucket_name)
+    workflow_job_def=$(terraform -chdir={{tf_dir}} output -raw workflow_job_definition_name)
+    coordinator_job_def=$(terraform -chdir={{tf_dir}} output -raw coordinator_job_definition_name)
     snakemake \
         --snakefile "{{workflow_dir}}/Snakefile" \
         --executor aws-basic-batch \
         --aws-basic-batch-coordinator true \
         --aws-basic-batch-region "$region" \
-        --aws-basic-batch-job-queue "$workflow_job_queue" \
+        --aws-basic-batch-job-queue "$workflow_queue" \
         --aws-basic-batch-job-definition "$workflow_job_def" \
         --aws-basic-batch-coordinator-job-definition "$coordinator_job_def" \
-        --aws-basic-batch-coordinator-queue "$coordinator_job_queue" \
+        --aws-basic-batch-coordinator-queue "$coordinator_queue" \
         --default-storage-provider s3 \
         --default-storage-prefix "s3://$bucket" \
         --jobs 10 \
@@ -114,7 +113,7 @@ logs:
         echo "No log stream available yet. Job may still be starting."
         exit 1
     fi
-    log_group=$(terraform -chdir={{coordinator_tf_dir}} output -raw log_group_name)
+    log_group=$(terraform -chdir={{tf_dir}} output -raw log_group_name)
     aws logs get-log-events \
         --log-group-name "$log_group" \
         --log-stream-name "$log_stream" \
@@ -142,60 +141,45 @@ watch:
 
 # =============================================================================
 # Infrastructure
-# Requires coordinator to be deployed first via: terraform -chdir=../terraform/coordinator apply
 # =============================================================================
 
-# Initialize workflow terraform
+# Initialize terraform
 tf-init:
-    terraform -chdir={{workflow_tf_dir}} init
+    terraform -chdir={{tf_dir}} init
 
-# Run terraform command with coordinator outputs as variables
-[private]
-tf-with-coordinator-vars cmd *args:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd {{coordinator_tf_dir}}
-    exec terraform -chdir=../simple-workflow {{cmd}} \
-        -var="coordinator_job_queue_arn=$(terraform output -raw job_queue_arn)" \
-        -var="job_role_arn=$(terraform output -raw job_role_arn)" \
-        -var="execution_role_arn=$(terraform output -raw execution_role_arn)" \
-        -var="log_group_name=$(terraform output -raw log_group_name)" \
-        -var="log_group_arn=$(terraform output -raw log_group_arn)" \
-        -var="bucket_arn=$(terraform output -raw bucket_arn)" \
-        -var="vpc_id=$(terraform output -raw vpc_id)" \
-        -var="subnet_ids=$(terraform output -json subnet_ids)" \
-        {{args}}
+# Plan infrastructure
+tf-plan *args:
+    terraform -chdir={{tf_dir}} plan {{args}}
 
-# Plan workflow infrastructure
-tf-plan *args: (tf-with-coordinator-vars "plan" args)
+# Apply infrastructure
+tf-apply *args:
+    terraform -chdir={{tf_dir}} apply {{args}}
 
-# Apply workflow infrastructure
-tf-apply-new *args: (tf-with-coordinator-vars "apply" args)
+# Destroy infrastructure
+tf-destroy *args:
+    terraform -chdir={{tf_dir}} destroy {{args}}
 
-# Destroy workflow infrastructure
-tf-destroy *args: (tf-with-coordinator-vars "destroy" args)
-
-# Show workflow terraform outputs
+# Show terraform outputs
 tf-output *args:
-    terraform -chdir={{workflow_tf_dir}} output {{args}}
+    terraform -chdir={{tf_dir}} output {{args}}
 
 # Generate snakemake command using deployed infrastructure
 tf-snakemake-cmd:
     #!/usr/bin/env bash
     set -euo pipefail
-    region=$(terraform -chdir={{coordinator_tf_dir}} output -raw region)
-    coordinator_job_queue=$(terraform -chdir={{coordinator_tf_dir}} output -raw job_queue_name)
-    bucket=$(terraform -chdir={{coordinator_tf_dir}} output -raw bucket_name)
-    workflow_job_queue=$(terraform -chdir={{workflow_tf_dir}} output -raw job_queue_name)
-    workflow_job_def=$(terraform -chdir={{workflow_tf_dir}} output -raw job_definition_name)
-    coordinator_job_def=$(terraform -chdir={{workflow_tf_dir}} output -raw coordinator_job_definition_name)
+    region=$(terraform -chdir={{tf_dir}} output -raw region)
+    coordinator_queue=$(terraform -chdir={{tf_dir}} output -raw coordinator_job_queue_name)
+    workflow_queue=$(terraform -chdir={{tf_dir}} output -raw workflow_job_queue_name)
+    bucket=$(terraform -chdir={{tf_dir}} output -raw bucket_name)
+    workflow_job_def=$(terraform -chdir={{tf_dir}} output -raw workflow_job_definition_name)
+    coordinator_job_def=$(terraform -chdir={{tf_dir}} output -raw coordinator_job_definition_name)
 
     echo "snakemake --executor aws-basic-batch \\"
     echo "    --aws-basic-batch-region $region \\"
-    echo "    --aws-basic-batch-job-queue $workflow_job_queue \\"
+    echo "    --aws-basic-batch-job-queue $workflow_queue \\"
     echo "    --aws-basic-batch-job-definition $workflow_job_def \\"
     echo "    --aws-basic-batch-coordinator true \\"
     echo "    --aws-basic-batch-coordinator-job-definition $coordinator_job_def \\"
-    echo "    --aws-basic-batch-coordinator-queue $coordinator_job_queue \\"
+    echo "    --aws-basic-batch-coordinator-queue $coordinator_queue \\"
     echo "    --default-storage-provider s3 \\"
     echo "    --default-storage-prefix s3://$bucket"

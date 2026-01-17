@@ -1,0 +1,82 @@
+# Snakemake AWS Basic Batch Configuration
+# Copy to terraform.tfvars and edit with your values
+
+# =============================================================================
+# Core Settings
+# =============================================================================
+
+coordinator_name_prefix = "snakemake-coordinator"
+workflow_name_prefix    = "snakemake-simple-workflow"
+region                  = "us-east-1"
+
+tags = {
+  Environment = "dev"
+}
+
+# =============================================================================
+# VPC Configuration
+# =============================================================================
+
+# Create a new VPC (set to false to use existing)
+create_vpc = true
+
+# If using existing VPC, provide these:
+# vpc_id     = "vpc-xxxxxxxx"
+# subnet_ids = ["subnet-xxxxxxxx", "subnet-yyyyyyyy"]
+
+# CIDR for new VPC
+# vpc_cidr = "10.0.0.0/16"
+
+# =============================================================================
+# Batch Compute Environment
+# =============================================================================
+
+# Compute type: FARGATE, FARGATE_SPOT, EC2, or SPOT
+compute_type = "EC2"
+
+# Maximum vCPUs for the workflow compute environment
+max_vcpus = 256
+
+# Maximum vCPUs for the coordinator compute environment
+coordinator_max_vcpus = 16
+
+# EC2/SPOT only settings (ignored for Fargate)
+# instance_types = ["optimal"]
+# min_vcpus      = 0
+
+# =============================================================================
+# Job Definitions
+# =============================================================================
+
+# Coordinator job (runs Snakemake)
+coordinator_vcpus  = 1
+coordinator_memory = 2048
+# coordinator_image = "custom-image:tag"  # Uses ECR if null and create_ecr=true
+
+# Workflow job (runs individual rules)
+workflow_vcpus  = 1
+workflow_memory = 2048
+# workflow_image = "custom-image:tag"  # Uses ECR if null and create_ecr=true
+
+# =============================================================================
+# Storage
+# =============================================================================
+
+# Create S3 bucket for workflow storage
+create_bucket = true
+
+# Specific bucket name (auto-generated if null)
+# bucket_name = "my-snakemake-bucket"
+
+# Additional S3 bucket ARNs for job access (beyond created bucket)
+# s3_bucket_arns = ["arn:aws:s3:::other-bucket"]
+
+# =============================================================================
+# ECR Repositories
+# =============================================================================
+
+# Create ECR repositories for coordinator and workflow images
+create_ecr = true
+
+# Prefix for ECR repository names (uses name_prefix if null)
+# ecr_repository_prefix = "my-workflow"
