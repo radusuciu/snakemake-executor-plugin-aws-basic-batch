@@ -98,6 +98,17 @@ class ExecutorSettings(ExecutorSettingsBase):
             "required": False,
         },
     )
+    task_timeout: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Job timeout in seconds. Jobs exceeding this duration will be terminated. "
+                "Minimum value is 60 seconds. Can be overridden per-rule via aws_batch_task_timeout resource."
+            ),
+            "env_var": True,
+            "required": False,
+        },
+    )
 
 
 common_settings = CommonSettings(
@@ -258,6 +269,9 @@ class Executor(RemoteExecutor):
             "job_definition": job.resources.get(
                 "aws_batch_job_definition", self.settings.job_definition
             ),
+            "task_timeout": job.resources.get(
+                "aws_batch_task_timeout", self.settings.task_timeout
+            ),
         }
 
     def run_job(self, job: JobExecutorInterface):
@@ -276,23 +290,31 @@ class Executor(RemoteExecutor):
 
         self.logger.debug(
             f"Job resources: vcpu={resources['vcpu']}, mem={resources['mem_mb']}MB, "
+            f"timeout={resources.get('task_timeout')}s, "
             f"queue={resources['job_queue']}, definition={resources['job_definition']}"
         )
 
+        submit_kwargs = {
+            "jobName": job_name,
+            "jobQueue": resources["job_queue"],
+            "jobDefinition": resources["job_definition"],
+            "containerOverrides": {
+                "command": ["/bin/bash", "-c", job_command],
+                "environment": environment,
+                "resourceRequirements": [
+                    {"type": "VCPU", "value": str(resources["vcpu"])},
+                    {"type": "MEMORY", "value": str(resources["mem_mb"])},
+                ],
+            },
+        }
+
+        if resources.get("task_timeout"):
+            submit_kwargs["timeout"] = {
+                "attemptDurationSeconds": int(resources["task_timeout"])
+            }
+
         try:
-            job_info = self.batch_client.submit_job(
-                jobName=job_name,
-                jobQueue=resources["job_queue"],
-                jobDefinition=resources["job_definition"],
-                containerOverrides={
-                    "command": ["/bin/bash", "-c", job_command],
-                    "environment": environment,
-                    "resourceRequirements": [
-                        {"type": "VCPU", "value": str(resources["vcpu"])},
-                        {"type": "MEMORY", "value": str(resources["mem_mb"])},
-                    ],
-                },
-            )
+            job_info = self.batch_client.submit_job(**submit_kwargs)
 
             self.logger.debug(
                 f"AWS Batch job submitted: name={job_name}, id={job_info['jobId']}"

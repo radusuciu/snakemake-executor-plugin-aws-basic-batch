@@ -51,6 +51,7 @@ rule compute_heavy:
 | `aws_batch_mem_mb` | Memory in MiB | 1024 |
 | `aws_batch_job_queue` | Job queue ARN/name | `--aws-basic-batch-job-queue` |
 | `aws_batch_job_definition` | Job definition ARN/name | `--aws-basic-batch-job-definition` |
+| `aws_batch_task_timeout` | Job timeout in seconds (min: 60) | `--aws-basic-batch-task-timeout` |
 
 These values override the base job definition's resource configuration at submission time via AWS Batch's `containerOverrides.resourceRequirements`.
 
