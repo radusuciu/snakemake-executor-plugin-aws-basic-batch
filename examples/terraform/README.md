@@ -137,7 +137,3 @@ just run
 ```bash
 terraform destroy
 ```
-
-## Legacy Modules
-
-The `coordinator/` and `simple-workflow/` subdirectories contain the previous two-module architecture kept for reference. New deployments should use the consolidated `main.tf`.
