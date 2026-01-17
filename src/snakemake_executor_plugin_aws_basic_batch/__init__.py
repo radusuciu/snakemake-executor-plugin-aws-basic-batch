@@ -240,10 +240,33 @@ class Executor(RemoteExecutor):
 
         return super().run_jobs(jobs)
 
+    def _get_job_resources(self, job: JobExecutorInterface) -> dict:
+        """Extract AWS Batch resource overrides from Snakemake job resources.
+
+        Supported resources:
+        - aws_batch_vcpu: Number of vCPUs (default: 1)
+        - aws_batch_mem_mb: Memory in MiB (default: 1024)
+        - aws_batch_job_queue: Job queue ARN/name (default: settings.job_queue)
+        - aws_batch_job_definition: Job definition ARN/name (default: settings.job_definition)
+        """
+        return {
+            "vcpu": max(1, int(job.resources.get("aws_batch_vcpu", 1))),
+            "mem_mb": max(1, int(job.resources.get("aws_batch_mem_mb", 1024))),
+            "job_queue": job.resources.get(
+                "aws_batch_job_queue", self.settings.job_queue
+            ),
+            "job_definition": job.resources.get(
+                "aws_batch_job_definition", self.settings.job_definition
+            ),
+        }
+
     def run_job(self, job: JobExecutorInterface):
         """Submit a job to AWS Batch using the pre-configured job definition."""
         job_uuid = str(uuid.uuid4())
         job_name = f"snakejob-{job.name}-{job_uuid}"
+
+        # Extract per-rule resource overrides
+        resources = self._get_job_resources(job)
 
         # Get the command to execute
         job_command = self.format_job_exec(job)
@@ -251,14 +274,23 @@ class Executor(RemoteExecutor):
         # Build environment from envvars
         environment = [{"name": k, "value": v} for k, v in self.envvars().items()]
 
+        self.logger.debug(
+            f"Job resources: vcpu={resources['vcpu']}, mem={resources['mem_mb']}MB, "
+            f"queue={resources['job_queue']}, definition={resources['job_definition']}"
+        )
+
         try:
             job_info = self.batch_client.submit_job(
                 jobName=job_name,
-                jobQueue=self.settings.job_queue,
-                jobDefinition=self.settings.job_definition,
+                jobQueue=resources["job_queue"],
+                jobDefinition=resources["job_definition"],
                 containerOverrides={
                     "command": ["/bin/bash", "-c", job_command],
                     "environment": environment,
+                    "resourceRequirements": [
+                        {"type": "VCPU", "value": str(resources["vcpu"])},
+                        {"type": "MEMORY", "value": str(resources["mem_mb"])},
+                    ],
                 },
             )
 

@@ -31,6 +31,29 @@ Optional coordinator-specific settings:
 - `--aws-basic-batch-coordinator-queue` - Job queue for the coordinator (defaults to main queue)
 - `--aws-basic-batch-coordinator-job-definition` - Job definition for the coordinator (defaults to main job definition)
 
+## Per-Job Resource Customization
+
+Override CPU, memory, queue, or job definition on a per-rule basis using Snakemake's resource system:
+
+```python
+rule compute_heavy:
+    output: "result.txt"
+    resources:
+        aws_batch_vcpu=4,
+        aws_batch_mem_mb=8192,
+        aws_batch_job_queue="high-memory-queue"
+    shell: "python compute.py > {output}"
+```
+
+| Resource | Description | Default |
+|----------|-------------|---------|
+| `aws_batch_vcpu` | Number of vCPUs | 1 |
+| `aws_batch_mem_mb` | Memory in MiB | 1024 |
+| `aws_batch_job_queue` | Job queue ARN/name | `--aws-basic-batch-job-queue` |
+| `aws_batch_job_definition` | Job definition ARN/name | `--aws-basic-batch-job-definition` |
+
+These values override the base job definition's resource configuration at submission time via AWS Batch's `containerOverrides.resourceRequirements`.
+
 ## Requirements
 
 - Workflow and dependencies must be included in the container image
