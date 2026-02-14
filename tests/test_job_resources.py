@@ -1,4 +1,5 @@
 """Tests for AWS Batch job resource extraction."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,6 +9,7 @@ from snakemake_executor_plugin_aws_basic_batch import Executor
 
 class MockJob:
     """Minimal mock implementing JobExecutorInterface.resources as Mapping."""
+
     def __init__(self, name="test_job", resources=None):
         self.name = name
         self.resources = resources or {}
@@ -26,13 +28,18 @@ def executor():
 class TestGetJobResources:
     """Tests for _get_job_resources() method."""
 
-    @pytest.mark.parametrize("resource_name,bad_value,result_key", [
-        ("aws_batch_vcpu", 0, "vcpu"),
-        ("aws_batch_vcpu", -5, "vcpu"),
-        ("aws_batch_mem_mb", 0, "mem_mb"),
-        ("aws_batch_mem_mb", -1000, "mem_mb"),
-    ])
-    def test_enforces_minimum_values(self, executor, resource_name, bad_value, result_key):
+    @pytest.mark.parametrize(
+        "resource_name,bad_value,result_key",
+        [
+            ("aws_batch_vcpu", 0, "vcpu"),
+            ("aws_batch_vcpu", -5, "vcpu"),
+            ("aws_batch_mem_mb", 0, "mem_mb"),
+            ("aws_batch_mem_mb", -1000, "mem_mb"),
+        ],
+    )
+    def test_enforces_minimum_values(
+        self, executor, resource_name, bad_value, result_key
+    ):
         """Zero or negative values should be clamped to 1."""
         job = MockJob(resources={resource_name: bad_value})
         result = Executor._get_job_resources(executor, job)
@@ -68,14 +75,18 @@ class TestRunJob:
         executor.report_job_submission = MagicMock()
         executor.logger = MagicMock()
         executor.batch_client.submit_job = MagicMock(return_value={"jobId": "job-123"})
-        executor._get_job_resources = lambda job: Executor._get_job_resources(executor, job)
+        executor._get_job_resources = lambda job: Executor._get_job_resources(
+            executor, job
+        )
 
-        job = MockJob(resources={
-            "aws_batch_vcpu": 4,
-            "aws_batch_mem_mb": 8192,
-            "aws_batch_job_queue": "custom-queue",
-            "aws_batch_job_definition": "custom-def",
-        })
+        job = MockJob(
+            resources={
+                "aws_batch_vcpu": 4,
+                "aws_batch_mem_mb": 8192,
+                "aws_batch_job_queue": "custom-queue",
+                "aws_batch_job_definition": "custom-def",
+            }
+        )
 
         Executor.run_job(executor, job)
 
@@ -96,7 +107,9 @@ class TestRunJob:
         executor.logger = MagicMock()
         executor.batch_client.submit_job = MagicMock(return_value={"jobId": "job-123"})
         executor.settings.task_timeout = None
-        executor._get_job_resources = lambda job: Executor._get_job_resources(executor, job)
+        executor._get_job_resources = lambda job: Executor._get_job_resources(
+            executor, job
+        )
 
         job = MockJob(resources={"aws_batch_task_timeout": 300})
 
@@ -113,7 +126,9 @@ class TestRunJob:
         executor.logger = MagicMock()
         executor.batch_client.submit_job = MagicMock(return_value={"jobId": "job-123"})
         executor.settings.task_timeout = None
-        executor._get_job_resources = lambda job: Executor._get_job_resources(executor, job)
+        executor._get_job_resources = lambda job: Executor._get_job_resources(
+            executor, job
+        )
 
         job = MockJob(resources={})
 
