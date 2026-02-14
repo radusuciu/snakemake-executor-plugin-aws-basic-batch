@@ -42,3 +42,14 @@ tf-destroy *args:
 # Show terraform outputs
 tf-output *args:
     terraform -chdir={{tf_dir}} output {{args}}
+
+# =============================================================================
+# Release
+# =============================================================================
+
+# Bump version (e.g. `just bump patch`, `just bump minor`, `just bump major`)
+bump level:
+    uv version --bump {{level}}
+    git add pyproject.toml uv.lock
+    git commit -m "chore: bump version to $(uv version --short)"
+    git tag "v$(uv version --short)"
