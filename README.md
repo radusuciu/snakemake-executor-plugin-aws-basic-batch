@@ -11,9 +11,20 @@ snakemake --executor aws-basic-batch \
   --aws-basic-batch-region us-east-1 \
   --aws-basic-batch-job-queue my-queue \
   --aws-basic-batch-job-definition my-job-def \
+  --aws-basic-batch-tags "project=genomics,user=alice" \
   --default-storage-provider s3 \
   --default-storage-prefix s3://my-bucket/workdir
 ```
+
+### Workflow-Level Tags
+
+Apply tags to all submitted jobs (both regular and coordinator) for cost tracking, filtering, etc.:
+
+```bash
+--aws-basic-batch-tags "project=genomics,run=exp1,costcenter=research"
+```
+
+Tags are comma-separated `key=value` pairs. Can also be set via the `SNAKEMAKE_AWS_BASIC_BATCH_TAGS` environment variable.
 
 ## Coordinator Mode
 
@@ -41,7 +52,11 @@ rule compute_heavy:
     resources:
         aws_batch_vcpu=4,
         aws_batch_mem_mb=8192,
-        aws_batch_job_queue="high-memory-queue"
+        aws_batch_gpu=1,
+        aws_batch_job_queue="high-memory-queue",
+        aws_batch_job_name_prefix="myproject",
+        aws_batch_scheduling_priority=100,
+        aws_batch_job_uuid="my-run-id"
     shell: "python compute.py > {output}"
 ```
 
@@ -49,9 +64,13 @@ rule compute_heavy:
 |----------|-------------|---------|
 | `aws_batch_vcpu` | Number of vCPUs | 1 |
 | `aws_batch_mem_mb` | Memory in MiB | 1024 |
+| `aws_batch_gpu` | Number of GPUs (only included when > 0) | 0 |
 | `aws_batch_job_queue` | Job queue ARN/name | `--aws-basic-batch-job-queue` |
 | `aws_batch_job_definition` | Job definition ARN/name | `--aws-basic-batch-job-definition` |
 | `aws_batch_task_timeout` | Job timeout in seconds (min: 60) | `--aws-basic-batch-task-timeout` |
+| `aws_batch_job_name_prefix` | Custom prefix for job names | `snakejob` |
+| `aws_batch_scheduling_priority` | Scheduling priority override for fair-share queues | None |
+| `aws_batch_job_uuid` | Custom UUID/identifier for job names | auto-generated UUID |
 
 These values override the base job definition's resource configuration at submission time via AWS Batch's `containerOverrides.resourceRequirements`.
 

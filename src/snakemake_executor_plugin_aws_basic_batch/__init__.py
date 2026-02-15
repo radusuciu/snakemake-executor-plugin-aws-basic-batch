@@ -109,6 +109,17 @@ class ExecutorSettings(ExecutorSettingsBase):
             "required": False,
         },
     )
+    tags: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Tags to apply to submitted jobs as comma-separated key=value pairs "
+                "(e.g. 'project=genomics,run=exp1'). Applied to both regular and coordinator jobs."
+            ),
+            "env_var": True,
+            "required": False,
+        },
+    )
 
 
 common_settings = CommonSettings(
@@ -145,6 +156,22 @@ class Executor(RemoteExecutor):
             self._coordinator_pending = True
         else:
             self._coordinator_pending = False
+
+    def _parse_tags(self) -> dict:
+        """Parse tags setting into a dict for submit_job().
+
+        Format: "key1=value1,key2=value2"
+        Returns empty dict if no tags configured.
+        """
+        if not self.settings.tags:
+            return {}
+        tags = {}
+        for pair in self.settings.tags.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                key, value = pair.split("=", 1)
+                tags[key.strip()] = value.strip()
+        return tags
 
     def _is_coordinator_context(self) -> bool:
         """Check if we're running inside a coordinator job."""
@@ -208,16 +235,22 @@ class Executor(RemoteExecutor):
         command = self._build_coordinator_command()
         self.logger.debug(f"Coordinator command: {command}")
 
+        submit_kwargs = {
+            "jobName": job_name,
+            "jobQueue": coordinator_queue,
+            "jobDefinition": coordinator_job_def,
+            "containerOverrides": {
+                "command": ["/bin/bash", "-c", command],
+                "environment": self._get_coordinator_environment(),
+            },
+        }
+
+        tags = self._parse_tags()
+        if tags:
+            submit_kwargs["tags"] = tags
+
         try:
-            job_info = self.batch_client.submit_job(
-                jobName=job_name,
-                jobQueue=coordinator_queue,
-                jobDefinition=coordinator_job_def,
-                containerOverrides={
-                    "command": ["/bin/bash", "-c", command],
-                    "environment": self._get_coordinator_environment(),
-                },
-            )
+            job_info = self.batch_client.submit_job(**submit_kwargs)
         except Exception as e:
             raise WorkflowError(f"Failed to submit coordinator job: {e}") from e
 
@@ -257,12 +290,17 @@ class Executor(RemoteExecutor):
         Supported resources:
         - aws_batch_vcpu: Number of vCPUs (default: 1)
         - aws_batch_mem_mb: Memory in MiB (default: 1024)
+        - aws_batch_gpu: Number of GPUs (default: 0, only included when > 0)
         - aws_batch_job_queue: Job queue ARN/name (default: settings.job_queue)
         - aws_batch_job_definition: Job definition ARN/name (default: settings.job_definition)
+        - aws_batch_job_name_prefix: Custom job name prefix (default: "snakejob")
+        - aws_batch_scheduling_priority: Scheduling priority override (default: None)
+        - aws_batch_job_uuid: Custom UUID/identifier for job names (default: auto-generated UUID)
         """
         return {
             "vcpu": max(1, int(job.resources.get("aws_batch_vcpu", 1))),
             "mem_mb": max(1, int(job.resources.get("aws_batch_mem_mb", 1024))),
+            "gpu": int(job.resources.get("aws_batch_gpu", 0)),
             "job_queue": job.resources.get(
                 "aws_batch_job_queue", self.settings.job_queue
             ),
@@ -272,15 +310,25 @@ class Executor(RemoteExecutor):
             "task_timeout": job.resources.get(
                 "aws_batch_task_timeout", self.settings.task_timeout
             ),
+            "job_name_prefix": job.resources.get(
+                "aws_batch_job_name_prefix", "snakejob"
+            ),
+            "scheduling_priority": job.resources.get(
+                "aws_batch_scheduling_priority", None
+            ),
+            "job_uuid": job.resources.get(
+                "aws_batch_job_uuid", str(uuid.uuid4())
+            ),
         }
 
     def run_job(self, job: JobExecutorInterface):
         """Submit a job to AWS Batch using the pre-configured job definition."""
-        job_uuid = str(uuid.uuid4())
-        job_name = f"snakejob-{job.name}-{job_uuid}"
-
         # Extract per-rule resource overrides
         resources = self._get_job_resources(job)
+
+        job_uuid = resources["job_uuid"]
+        prefix = resources["job_name_prefix"]
+        job_name = f"{prefix}-{job.name}-{job_uuid}"
 
         # Get the command to execute
         job_command = self.format_job_exec(job)
@@ -290,9 +338,19 @@ class Executor(RemoteExecutor):
 
         self.logger.debug(
             f"Job resources: vcpu={resources['vcpu']}, mem={resources['mem_mb']}MB, "
-            f"timeout={resources.get('task_timeout')}s, "
+            f"gpu={resources['gpu']}, timeout={resources.get('task_timeout')}s, "
             f"queue={resources['job_queue']}, definition={resources['job_definition']}"
         )
+
+        resource_requirements = [
+            {"type": "VCPU", "value": str(resources["vcpu"])},
+            {"type": "MEMORY", "value": str(resources["mem_mb"])},
+        ]
+
+        if resources["gpu"] > 0:
+            resource_requirements.append(
+                {"type": "GPU", "value": str(resources["gpu"])}
+            )
 
         submit_kwargs = {
             "jobName": job_name,
@@ -301,10 +359,7 @@ class Executor(RemoteExecutor):
             "containerOverrides": {
                 "command": ["/bin/bash", "-c", job_command],
                 "environment": environment,
-                "resourceRequirements": [
-                    {"type": "VCPU", "value": str(resources["vcpu"])},
-                    {"type": "MEMORY", "value": str(resources["mem_mb"])},
-                ],
+                "resourceRequirements": resource_requirements,
             },
         }
 
@@ -312,6 +367,15 @@ class Executor(RemoteExecutor):
             submit_kwargs["timeout"] = {
                 "attemptDurationSeconds": int(resources["task_timeout"])
             }
+
+        if resources.get("scheduling_priority") is not None:
+            submit_kwargs["schedulingPriorityOverride"] = int(
+                resources["scheduling_priority"]
+            )
+
+        tags = self._parse_tags()
+        if tags:
+            submit_kwargs["tags"] = tags
 
         try:
             job_info = self.batch_client.submit_job(**submit_kwargs)
