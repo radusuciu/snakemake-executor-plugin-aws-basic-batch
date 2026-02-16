@@ -316,9 +316,7 @@ class Executor(RemoteExecutor):
             "scheduling_priority": job.resources.get(
                 "aws_batch_scheduling_priority", None
             ),
-            "job_uuid": job.resources.get(
-                "aws_batch_job_uuid", str(uuid.uuid4())
-            ),
+            "job_uuid": job.resources.get("aws_batch_job_uuid", str(uuid.uuid4())),
         }
 
     def run_job(self, job: JobExecutorInterface):
