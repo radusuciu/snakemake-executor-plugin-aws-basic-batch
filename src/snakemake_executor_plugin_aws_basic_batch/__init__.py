@@ -181,25 +181,13 @@ class Executor(RemoteExecutor):
         """Build the coordinator command.
 
         The workflow is expected to be included in the container image.
-        We forward all original arguments except --snakefile (since the
-        Snakefile is in the container's working directory, not the local path).
+        All original arguments are forwarded, including --snakefile.
+        Relative snakefile paths work because the container's WORKDIR
+        mirrors the source tree structure.
         The COORDINATOR_CONTEXT_ENV_VAR prevents recursion.
         """
-        # Filter out --snakefile and -s arguments since the path is local
         args = sys.argv[1:]
-        filtered_args = []
-        skip_next = False
-        for arg in args:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg in ("--snakefile", "-s"):
-                skip_next = True  # Skip the next argument (the path)
-                continue
-            if arg.startswith("--snakefile=") or arg.startswith("-s="):
-                continue  # Skip --snakefile=path form
-            filtered_args.append(arg)
-        return f"snakemake {shlex.join(filtered_args)}"
+        return f"snakemake {shlex.join(args)}"
 
     def _get_coordinator_environment(self) -> list:
         """Build environment variables for coordinator job."""

@@ -71,7 +71,7 @@ run *args:
     workflow_job_def=$(terraform -chdir={{tf_dir}} output -raw workflow_job_definition_name)
     coordinator_job_def=$(terraform -chdir={{tf_dir}} output -raw coordinator_job_definition_name)
     snakemake \
-        --snakefile "{{workflow_dir}}/Snakefile" \
+        --snakefile Snakefile \
         --executor aws-basic-batch \
         --aws-basic-batch-coordinator true \
         --aws-basic-batch-region "$region" \

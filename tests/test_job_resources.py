@@ -1,7 +1,7 @@
-"""Tests for AWS Batch job resource extraction."""
+"""Tests for AWS Batch job resource extraction and coordinator commands."""
 
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -327,3 +327,43 @@ class TestParseTags:
         ex = MagicMock()
         ex.settings.tags = "arn=arn:aws:foo:bar"
         assert Executor._parse_tags(ex) == {"arn": "arn:aws:foo:bar"}
+
+
+class TestBuildCoordinatorCommand:
+    """Tests for _build_coordinator_command() method."""
+
+    def _call(self, argv):
+        """Call _build_coordinator_command with a mocked sys.argv."""
+        ex = MagicMock()
+        with patch("sys.argv", ["snakemake"] + argv):
+            return Executor._build_coordinator_command(ex)
+
+    def test_preserves_snakefile_flag(self):
+        """--snakefile should be forwarded to the coordinator command."""
+        cmd = self._call(["--snakefile", "workflow/Snakefile", "--cores", "4"])
+        assert cmd == "snakemake --snakefile workflow/Snakefile --cores 4"
+
+    def test_preserves_snakefile_short_flag(self):
+        """-s should be forwarded to the coordinator command."""
+        cmd = self._call(["-s", "alt/Snakefile", "--cores", "1"])
+        assert cmd == "snakemake -s alt/Snakefile --cores 1"
+
+    def test_preserves_snakefile_equals_form(self):
+        """--snakefile=path form should be forwarded."""
+        cmd = self._call(["--snakefile=workflow/Snakefile", "--cores", "2"])
+        assert cmd == "snakemake --snakefile=workflow/Snakefile --cores 2"
+
+    def test_no_snakefile_flag(self):
+        """Command without --snakefile should work normally."""
+        cmd = self._call(["--cores", "4", "--executor", "aws-basic-batch"])
+        assert cmd == "snakemake --cores 4 --executor aws-basic-batch"
+
+    def test_empty_args(self):
+        """Empty arguments should produce a bare snakemake command."""
+        cmd = self._call([])
+        assert cmd == "snakemake "
+
+    def test_special_characters_are_quoted(self):
+        """Arguments with special characters should be properly shell-quoted."""
+        cmd = self._call(["--config", "key=value with spaces"])
+        assert "'key=value with spaces'" in cmd
