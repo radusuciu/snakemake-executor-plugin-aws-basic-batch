@@ -2,6 +2,16 @@
 name = "snakemake-executor-plugin-aws-basic-batch"
 requires-python = ">=3.11,<4.0"
 version = "0.2.0"
+description = "A Snakemake executor plugin for AWS Batch that uses pre-configured job definitions."
+license = "MIT"
+readme = "README.md"
+keywords = ["snakemake", "executor", "plugin", "aws", "batch"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+]
 dependencies = [
     "snakemake-interface-common>=1.22.0,<2",
     "snakemake-interface-executor-plugins>=9.3.9,<10",
@@ -11,7 +21,9 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/radusuciu/snakemake-executor-plugin-aws-basic-batch"
 Repository = "https://github.com/radusuciu/snakemake-executor-plugin-aws-basic-batch"
+Issues = "https://github.com/radusuciu/snakemake-executor-plugin-aws-basic-batch/issues"
 
 [[project.authors]]
 name = "Radu Suciu"
