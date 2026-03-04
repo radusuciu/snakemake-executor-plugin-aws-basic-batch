@@ -44,6 +44,20 @@ tf-output *args:
     terraform -chdir={{tf_dir}} output {{args}}
 
 # =============================================================================
+# Lint
+# =============================================================================
+
+# Run ruff linter and formatter check
+lint:
+    uv run ruff check .
+    uv run ruff format --check .
+
+# Fix lint and formatting issues
+lint-fix:
+    uv run ruff check --fix .
+    uv run ruff format .
+
+# =============================================================================
 # Release
 # =============================================================================
 
