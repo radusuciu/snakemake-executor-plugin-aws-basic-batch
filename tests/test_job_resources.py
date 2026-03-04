@@ -379,13 +379,15 @@ class TestSubmitCoordinatorJob:
         executor.settings.coordinator_job_name_prefix = None
         executor.settings.coordinator_job_uuid = None
         executor.logger = MagicMock()
-        executor.batch_client.submit_job = MagicMock(return_value={"jobId": "coord-123"})
+        executor.batch_client.submit_job = MagicMock(
+            return_value={"jobId": "coord-123"}
+        )
         executor.workflow.persistence.path = MagicMock()
         executor.workflow.persistence.path.__truediv__ = MagicMock(
             return_value=MagicMock(exists=MagicMock(return_value=False))
         )
-        executor._build_coordinator_command = lambda: Executor._build_coordinator_command(
-            executor
+        executor._build_coordinator_command = (
+            lambda: Executor._build_coordinator_command(executor)
         )
         executor._get_coordinator_environment = (
             lambda: Executor._get_coordinator_environment(executor)
