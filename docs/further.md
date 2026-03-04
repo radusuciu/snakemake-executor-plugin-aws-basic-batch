@@ -12,7 +12,7 @@ The key design choice is that **job definitions must be pre-created** (e.g., via
 | Container images | Workflow files bundled in image | Sources deployed at runtime |
 | Infrastructure setup | Explicit (Terraform/CloudFormation) | Automatic |
 | Coordinator mode | Built-in fire-and-forget mode | Not available |
-| Resource overrides | Per-rule CPU, memory, GPU, queue, timeout | Per-rule CPU, memory |
+| Resource overrides | Per-rule CPU, memory, GPU, queue, job definition, timeout, scheduling priority, job naming | Per-rule CPU, memory |
 
 ## Prerequisites
 
@@ -74,7 +74,7 @@ The plugin overrides CPU, memory, and GPU at submit time via `containerOverrides
 | `aws_batch_job_definition` | Job definition ARN/name | `--aws-basic-batch-job-definition` |
 | `aws_batch_task_timeout` | Job timeout in seconds (min: 60) | `--aws-basic-batch-task-timeout` |
 | `aws_batch_job_name_prefix` | Custom prefix for job names | `snakejob` |
-| `aws_batch_scheduling_priority` | Scheduling priority for fair-share queues | None |
+| `aws_batch_scheduling_priority` | Scheduling priority override for fair-share queues | None |
 | `aws_batch_job_uuid` | Custom UUID/identifier for job names | auto-generated UUID |
 
 ### Compute Resources (vCPU, Memory, GPU)
