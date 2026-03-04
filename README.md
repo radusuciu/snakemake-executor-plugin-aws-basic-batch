@@ -41,6 +41,8 @@ The coordinator job runs Snakemake itself on AWS Batch, submitting and monitorin
 Optional coordinator-specific settings:
 - `--aws-basic-batch-coordinator-queue` - Job queue for the coordinator (defaults to main queue)
 - `--aws-basic-batch-coordinator-job-definition` - Job definition for the coordinator (defaults to main job definition)
+- `--aws-basic-batch-coordinator-job-name-prefix` - Custom prefix for coordinator job names (defaults to `snakemake-coordinator`)
+- `--aws-basic-batch-coordinator-job-uuid` - Custom UUID/identifier for coordinator job names (defaults to auto-generated UUID)
 
 ## Per-Job Resource Customization
 

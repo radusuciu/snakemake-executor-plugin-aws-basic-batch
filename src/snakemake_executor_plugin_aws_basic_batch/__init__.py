@@ -98,6 +98,28 @@ class ExecutorSettings(ExecutorSettingsBase):
             "required": False,
         },
     )
+    coordinator_job_name_prefix: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Custom prefix for coordinator job names. "
+                "Defaults to 'snakemake-coordinator'."
+            ),
+            "env_var": True,
+            "required": False,
+        },
+    )
+    coordinator_job_uuid: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Custom UUID/identifier for coordinator job names. "
+                "Defaults to an auto-generated UUID."
+            ),
+            "env_var": True,
+            "required": False,
+        },
+    )
     task_timeout: Optional[int] = field(
         default=None,
         metadata={
@@ -212,8 +234,9 @@ class Executor(RemoteExecutor):
         After successful submission, exits with code 0. The coordinator job
         will handle the actual workflow execution in AWS Batch.
         """
-        job_uuid = str(uuid.uuid4())
-        job_name = f"snakemake-coordinator-{job_uuid}"
+        job_uuid = self.settings.coordinator_job_uuid or str(uuid.uuid4())
+        prefix = self.settings.coordinator_job_name_prefix or "snakemake-coordinator"
+        job_name = f"{prefix}-{job_uuid}"
 
         coordinator_queue = self.settings.coordinator_queue or self.settings.job_queue
         coordinator_job_def = (

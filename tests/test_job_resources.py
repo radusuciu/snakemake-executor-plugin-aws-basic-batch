@@ -367,3 +367,72 @@ class TestBuildCoordinatorCommand:
         """Arguments with special characters should be properly shell-quoted."""
         cmd = self._call(["--config", "key=value with spaces"])
         assert "'key=value with spaces'" in cmd
+
+
+class TestSubmitCoordinatorJob:
+    """Tests for coordinator job name customization."""
+
+    def _setup_executor(self, executor):
+        """Wire up common mocks for coordinator job tests."""
+        executor.settings.coordinator_queue = None
+        executor.settings.coordinator_job_definition = None
+        executor.settings.coordinator_job_name_prefix = None
+        executor.settings.coordinator_job_uuid = None
+        executor.logger = MagicMock()
+        executor.batch_client.submit_job = MagicMock(return_value={"jobId": "coord-123"})
+        executor.workflow.persistence.path = MagicMock()
+        executor.workflow.persistence.path.__truediv__ = MagicMock(
+            return_value=MagicMock(exists=MagicMock(return_value=False))
+        )
+        executor._build_coordinator_command = lambda: Executor._build_coordinator_command(
+            executor
+        )
+        executor._get_coordinator_environment = (
+            lambda: Executor._get_coordinator_environment(executor)
+        )
+        executor._parse_tags = lambda: Executor._parse_tags(executor)
+
+    def test_custom_prefix(self, executor):
+        """Custom prefix should be used in coordinator job name."""
+        self._setup_executor(executor)
+        executor.settings.coordinator_job_name_prefix = "my-workflow"
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs["jobName"].startswith("my-workflow-")
+
+    def test_default_prefix(self, executor):
+        """Default prefix should be 'snakemake-coordinator' when not set."""
+        self._setup_executor(executor)
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs["jobName"].startswith("snakemake-coordinator-")
+
+    def test_custom_uuid(self, executor):
+        """Custom UUID should be used in coordinator job name."""
+        self._setup_executor(executor)
+        executor.settings.coordinator_job_uuid = "fixed-run-id"
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs["jobName"].endswith("-fixed-run-id")
+
+    def test_default_uuid_is_valid(self, executor):
+        """Default UUID should be a valid auto-generated UUID when not set."""
+        self._setup_executor(executor)
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        job_name = call_kwargs["jobName"]
+        # Format: snakemake-coordinator-<uuid>
+        uuid_part = job_name.removeprefix("snakemake-coordinator-")
+        uuid.UUID(uuid_part)  # raises ValueError if not valid
