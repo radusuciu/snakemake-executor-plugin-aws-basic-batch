@@ -2,6 +2,8 @@
 
 A Snakemake executor plugin for AWS Batch that uses pre-configured job definitions.
 
+For full documentation, see the [Snakemake Plugin Catalog](https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/aws-basic-batch.html).
+
 Unlike the [standard AWS Batch plugin](https://github.com/snakemake/snakemake-executor-plugin-aws-batch) which dynamically creates job definitions, this "basic" plugin relies on existing job definitions. This allows all resource configuration to be managed externally (e.g., via Terraform/CloudFormation). Additionally, workflow files and dependencies must bundled in the container image.
 
 ## Usage
