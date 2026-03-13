@@ -1,7 +1,6 @@
 """Tests for AWS Batch job resource extraction and coordinator commands."""
 
 import uuid
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -466,6 +465,4 @@ class TestSubmitCoordinatorJob:
             "locks directory was deleted — concurrent processes will get "
             "FileNotFoundError when creating lock files"
         )
-        assert other_process_lock.exists(), (
-            "another process's lock file was deleted"
-        )
+        assert other_process_lock.exists(), "another process's lock file was deleted"
