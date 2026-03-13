@@ -13,7 +13,6 @@ __license__ = "MIT"
 
 import os
 import shlex
-import shutil
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -277,10 +276,11 @@ class Executor(RemoteExecutor):
             f"You can now safely disconnect."
         )
 
-        # Clean up workflow lock before exiting - os._exit() bypasses normal cleanup
-        lock_dir = self.workflow.persistence.path / "locks"
-        if lock_dir.exists():
-            shutil.rmtree(lock_dir)
+        # Clean up this process's lock files before exiting.
+        # os._exit() bypasses the finally block in persistence.lock(),
+        # so we call unlock() manually. Unlike shutil.rmtree(), this only
+        # removes lock files created by this process, not the entire directory.
+        self.workflow.persistence.unlock()
 
         # Use os._exit(0) to terminate immediately without raising SystemExit.
         # sys.exit(0) raises SystemExit which Snakemake's scheduler catches

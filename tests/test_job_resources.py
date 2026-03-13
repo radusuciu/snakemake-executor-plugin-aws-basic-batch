@@ -1,6 +1,7 @@
 """Tests for AWS Batch job resource extraction and coordinator commands."""
 
 import uuid
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -438,3 +439,33 @@ class TestSubmitCoordinatorJob:
         # Format: snakemake-coordinator-<uuid>
         uuid_part = job_name.removeprefix("snakemake-coordinator-")
         uuid.UUID(uuid_part)  # raises ValueError if not valid
+
+    def test_does_not_delete_locks_directory(self, executor, tmp_path):
+        """Lock cleanup should not delete the locks directory itself.
+
+        When concurrent Snakemake processes share .snakemake/locks/,
+        deleting the directory (shutil.rmtree) races with other processes
+        that expect the directory to exist for lock file creation.
+        The cleanup should only remove this process's lock files.
+        """
+        self._setup_executor(executor)
+
+        # Set up a real locks directory with another process's lock file
+        lock_dir = tmp_path / "locks"
+        lock_dir.mkdir()
+        other_process_lock = lock_dir / "1.input.lock"
+        other_process_lock.write_text("some/output/file.txt\n")
+
+        executor.workflow.persistence.path = tmp_path
+        executor.workflow.persistence.unlock = MagicMock()
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        assert lock_dir.exists(), (
+            "locks directory was deleted — concurrent processes will get "
+            "FileNotFoundError when creating lock files"
+        )
+        assert other_process_lock.exists(), (
+            "another process's lock file was deleted"
+        )
