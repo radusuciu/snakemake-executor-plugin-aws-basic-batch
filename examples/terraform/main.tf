@@ -613,6 +613,7 @@ data "aws_iam_policy_document" "job_batch" {
     effect = "Allow"
     actions = [
       "batch:SubmitJob",
+      "batch:TagResource",
     ]
     resources = [
       # Both job queues
