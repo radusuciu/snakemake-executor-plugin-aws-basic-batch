@@ -81,7 +81,8 @@ just run
 | `vpc_cidr` | CIDR block for new VPC | `10.0.0.0/16` |
 | `availability_zones` | AZs for subnets (defaults to first 2 in region) | `[]` |
 | **Batch Compute** | | |
-| `compute_type` | `FARGATE`, `FARGATE_SPOT`, `EC2`, or `SPOT` | `FARGATE` |
+| `coordinator_compute_type` | Batch compute type for coordinator: `FARGATE`, `FARGATE_SPOT`, `EC2`, or `SPOT` | `FARGATE` |
+| `workflow_compute_type` | Batch compute type for workflow jobs: `FARGATE`, `FARGATE_SPOT`, `EC2`, or `SPOT` | `EC2` |
 | `instance_types` | EC2 instance types (only for EC2/SPOT) | `["optimal"]` |
 | `min_vcpus` | Min vCPUs for compute env (only for EC2/SPOT) | `0` |
 | `max_vcpus` | Max vCPUs for workflow compute environment | `256` |

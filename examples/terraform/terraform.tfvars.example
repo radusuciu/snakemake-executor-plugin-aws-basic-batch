@@ -32,7 +32,8 @@ create_vpc = true
 # =============================================================================
 
 # Compute type: FARGATE, FARGATE_SPOT, EC2, or SPOT
-compute_type = "EC2"
+# coordinator_compute_type = "FARGATE"  # (default)
+workflow_compute_type = "EC2"
 
 # Maximum vCPUs for the workflow compute environment
 max_vcpus = 256

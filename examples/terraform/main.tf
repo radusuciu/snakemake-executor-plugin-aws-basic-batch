@@ -6,8 +6,8 @@
 # Resources created:
 # - VPC with public subnets (optional)
 # - S3 bucket for workflow storage (optional)
-# - Batch compute environment (single, shared)
-# - Batch job queue (single, shared)
+# - Batch compute environments (coordinator: Fargate by default, workflow: EC2 by default)
+# - Batch job queues (separate coordinator and workflow queues)
 # - Coordinator job definition
 # - Workflow job definition
 # - IAM roles (batch service, execution, job)
@@ -101,14 +101,25 @@ variable "availability_zones" {
 }
 
 # Batch Compute Configuration
-variable "compute_type" {
-  description = "Batch compute type: FARGATE, FARGATE_SPOT, EC2, or SPOT"
+variable "coordinator_compute_type" {
+  description = "Batch compute type for coordinator: FARGATE, FARGATE_SPOT, EC2, or SPOT"
   type        = string
   default     = "FARGATE"
 
   validation {
-    condition     = contains(["FARGATE", "FARGATE_SPOT", "EC2", "SPOT"], var.compute_type)
-    error_message = "compute_type must be FARGATE, FARGATE_SPOT, EC2, or SPOT"
+    condition     = contains(["FARGATE", "FARGATE_SPOT", "EC2", "SPOT"], var.coordinator_compute_type)
+    error_message = "coordinator_compute_type must be FARGATE, FARGATE_SPOT, EC2, or SPOT"
+  }
+}
+
+variable "workflow_compute_type" {
+  description = "Batch compute type for workflow jobs: FARGATE, FARGATE_SPOT, EC2, or SPOT"
+  type        = string
+  default     = "EC2"
+
+  validation {
+    condition     = contains(["FARGATE", "FARGATE_SPOT", "EC2", "SPOT"], var.workflow_compute_type)
+    error_message = "workflow_compute_type must be FARGATE, FARGATE_SPOT, EC2, or SPOT"
   }
 }
 
@@ -212,9 +223,13 @@ variable "ecr_repository_prefix" {
 locals {
   azs = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, 2)
 
-  # Compute type helpers
-  is_fargate = var.compute_type == "FARGATE" || var.compute_type == "FARGATE_SPOT"
-  is_ec2     = var.compute_type == "EC2" || var.compute_type == "SPOT"
+  # Coordinator compute type helpers
+  coordinator_is_fargate = var.coordinator_compute_type == "FARGATE" || var.coordinator_compute_type == "FARGATE_SPOT"
+  coordinator_is_ec2     = var.coordinator_compute_type == "EC2" || var.coordinator_compute_type == "SPOT"
+
+  # Workflow compute type helpers
+  workflow_is_fargate = var.workflow_compute_type == "FARGATE" || var.workflow_compute_type == "FARGATE_SPOT"
+  workflow_is_ec2     = var.workflow_compute_type == "EC2" || var.workflow_compute_type == "SPOT"
 
   common_tags = merge(var.tags, {
     ManagedBy = "terraform"
@@ -504,7 +519,7 @@ data "aws_iam_policy_document" "ec2_assume_role" {
 }
 
 resource "aws_iam_role" "ecs_instance" {
-  count = local.is_ec2 ? 1 : 0
+  count = (local.coordinator_is_ec2 || local.workflow_is_ec2) ? 1 : 0
 
   name_prefix        = "${var.workflow_name_prefix}-ecs-inst-"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
@@ -512,14 +527,14 @@ resource "aws_iam_role" "ecs_instance" {
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_instance" {
-  count = local.is_ec2 ? 1 : 0
+  count = (local.coordinator_is_ec2 || local.workflow_is_ec2) ? 1 : 0
 
   role       = aws_iam_role.ecs_instance[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
 }
 
 resource "aws_iam_instance_profile" "ecs_instance" {
-  count = local.is_ec2 ? 1 : 0
+  count = (local.coordinator_is_ec2 || local.workflow_is_ec2) ? 1 : 0
 
   name_prefix = "${var.workflow_name_prefix}-ecs-inst-"
   role        = aws_iam_role.ecs_instance[0].name
@@ -693,16 +708,16 @@ resource "aws_batch_compute_environment" "coordinator" {
   service_role                    = aws_iam_role.batch_service.arn
 
   compute_resources {
-    type      = var.compute_type
+    type      = var.coordinator_compute_type
     max_vcpus = var.coordinator_max_vcpus
 
     subnets            = local.subnet_ids
     security_group_ids = [aws_security_group.batch.id]
 
     # EC2/SPOT-specific settings
-    min_vcpus     = local.is_ec2 ? var.min_vcpus : null
-    instance_type = local.is_ec2 ? var.instance_types : null
-    instance_role = local.is_ec2 ? aws_iam_instance_profile.ecs_instance[0].arn : null
+    min_vcpus     = local.coordinator_is_ec2 ? var.min_vcpus : null
+    instance_type = local.coordinator_is_ec2 ? var.instance_types : null
+    instance_role = local.coordinator_is_ec2 ? aws_iam_instance_profile.ecs_instance[0].arn : null
   }
 
   tags = local.common_tags
@@ -720,16 +735,16 @@ resource "aws_batch_compute_environment" "workflow" {
   service_role                    = aws_iam_role.batch_service.arn
 
   compute_resources {
-    type      = var.compute_type
+    type      = var.workflow_compute_type
     max_vcpus = var.max_vcpus
 
     subnets            = local.subnet_ids
     security_group_ids = [aws_security_group.batch.id]
 
     # EC2/SPOT-specific settings
-    min_vcpus     = local.is_ec2 ? var.min_vcpus : null
-    instance_type = local.is_ec2 ? var.instance_types : null
-    instance_role = local.is_ec2 ? aws_iam_instance_profile.ecs_instance[0].arn : null
+    min_vcpus     = local.workflow_is_ec2 ? var.min_vcpus : null
+    instance_type = local.workflow_is_ec2 ? var.instance_types : null
+    instance_role = local.workflow_is_ec2 ? aws_iam_instance_profile.ecs_instance[0].arn : null
   }
 
   tags = local.common_tags
@@ -782,7 +797,7 @@ resource "aws_cloudwatch_log_group" "batch" {
 resource "aws_batch_job_definition" "coordinator" {
   name                  = "${var.coordinator_name_prefix}-coordinator"
   type                  = "container"
-  platform_capabilities = local.is_fargate ? ["FARGATE"] : ["EC2"]
+  platform_capabilities = local.coordinator_is_fargate ? ["FARGATE"] : ["EC2"]
   propagate_tags        = true
 
   container_properties = jsonencode({
@@ -805,7 +820,7 @@ resource "aws_batch_job_definition" "coordinator" {
       }
     }
 
-    networkConfiguration = local.is_fargate ? {
+    networkConfiguration = local.coordinator_is_fargate ? {
       assignPublicIp = "ENABLED"
     } : null
 
@@ -819,7 +834,7 @@ resource "aws_batch_job_definition" "coordinator" {
 resource "aws_batch_job_definition" "workflow" {
   name                  = "${var.workflow_name_prefix}-job"
   type                  = "container"
-  platform_capabilities = local.is_fargate ? ["FARGATE"] : ["EC2"]
+  platform_capabilities = local.workflow_is_fargate ? ["FARGATE"] : ["EC2"]
   propagate_tags        = true
 
   lifecycle {
@@ -849,7 +864,7 @@ resource "aws_batch_job_definition" "workflow" {
       }
     }
 
-    networkConfiguration = local.is_fargate ? {
+    networkConfiguration = local.workflow_is_fargate ? {
       assignPublicIp = "ENABLED"
     } : null
 
@@ -863,7 +878,7 @@ resource "aws_batch_job_definition" "workflow" {
 resource "aws_batch_job_definition" "workflow_coordinator" {
   name                  = "${var.workflow_name_prefix}-coordinator"
   type                  = "container"
-  platform_capabilities = local.is_fargate ? ["FARGATE"] : ["EC2"]
+  platform_capabilities = local.workflow_is_fargate ? ["FARGATE"] : ["EC2"]
   propagate_tags        = true
 
   container_properties = jsonencode({
@@ -886,7 +901,7 @@ resource "aws_batch_job_definition" "workflow_coordinator" {
       }
     }
 
-    networkConfiguration = local.is_fargate ? {
+    networkConfiguration = local.workflow_is_fargate ? {
       assignPublicIp = "ENABLED"
     } : null
 
