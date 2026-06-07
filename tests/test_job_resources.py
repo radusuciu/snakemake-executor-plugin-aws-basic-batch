@@ -268,6 +268,31 @@ class TestRunJob:
         call_kwargs = executor.batch_client.submit_job.call_args.kwargs
         assert "tags" not in call_kwargs
 
+    def test_propagate_tags_set_when_tags_present(self, executor):
+        """propagateTags should be True in submit_job when tags are configured."""
+        self._setup_executor(executor)
+        executor.settings.tags = "project=genomics,run=exp1"
+
+        job = MockJob(resources={})
+
+        Executor.run_job(executor, job)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs.get("propagateTags") is True
+
+    def test_no_propagate_tags_when_no_tags(self, executor):
+        """propagateTags should be absent from submit_job when no tags are configured."""
+        self._setup_executor(executor)
+
+        job = MockJob(resources={})
+
+        Executor.run_job(executor, job)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert "propagateTags" not in call_kwargs
+        # Coupling assertion: propagateTags must only be set when tags are present.
+        assert ("tags" in call_kwargs) == call_kwargs.get("propagateTags", False)
+
     def test_custom_job_uuid_in_job_name(self, executor):
         """Job name should contain custom UUID from resources."""
         self._setup_executor(executor)
@@ -438,6 +463,40 @@ class TestSubmitCoordinatorJob:
         # Format: snakemake-coordinator-<uuid>
         uuid_part = job_name.removeprefix("snakemake-coordinator-")
         uuid.UUID(uuid_part)  # raises ValueError if not valid
+
+    def test_coordinator_tags_included_in_submit(self, executor):
+        """Tags should be included in coordinator submit_job when configured."""
+        self._setup_executor(executor)
+        executor.settings.tags = "project=genomics,env=prod"
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs["tags"] == {"project": "genomics", "env": "prod"}
+
+    def test_coordinator_propagate_tags_set_when_tags_present(self, executor):
+        """propagateTags should be True in coordinator submit_job when tags are configured."""
+        self._setup_executor(executor)
+        executor.settings.tags = "project=genomics,env=prod"
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert call_kwargs.get("propagateTags") is True
+
+    def test_coordinator_no_propagate_tags_when_no_tags(self, executor):
+        """propagateTags should be absent from coordinator submit_job when no tags are configured."""
+        self._setup_executor(executor)
+
+        with patch("os._exit"):
+            Executor._submit_coordinator_job(executor)
+
+        call_kwargs = executor.batch_client.submit_job.call_args.kwargs
+        assert "propagateTags" not in call_kwargs
+        # Coupling assertion: propagateTags must only be set when tags are present.
+        assert ("tags" in call_kwargs) == call_kwargs.get("propagateTags", False)
 
     def test_does_not_delete_locks_directory(self, executor, tmp_path):
         """Lock cleanup should not delete the locks directory itself.

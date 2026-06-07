@@ -565,6 +565,23 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Allow the ECS execution role to tag tasks on creation. Accounts that enforce
+# ECS tagging authorization require this permission when propagating Batch job
+# tags to ECS tasks; tags-on-create authorization does not support narrower
+# resource scoping, so Resource "*" is required.
+resource "aws_iam_role_policy" "ecs_execution_tag" {
+  name_prefix = "${var.workflow_name_prefix}-ecs-exec-tag-"
+  role        = aws_iam_role.ecs_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ecs:TagResource"]
+      Resource = "*"
+    }]
+  })
+}
+
 # Job Role (shared by coordinator and workflow jobs)
 resource "aws_iam_role" "job" {
   name_prefix        = "${var.workflow_name_prefix}-job-"

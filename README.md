@@ -26,7 +26,7 @@ Apply tags to all submitted jobs (both regular and coordinator) for cost trackin
 --aws-basic-batch-tags "project=genomics,run=exp1,costcenter=research"
 ```
 
-Tags are comma-separated `key=value` pairs. Can also be set via the `SNAKEMAKE_AWS_BASIC_BATCH_TAGS` environment variable.
+Tags are comma-separated `key=value` pairs. Can also be set via the `SNAKEMAKE_AWS_BASIC_BATCH_TAGS` environment variable. Tags are propagated to the underlying ECS tasks for cost allocation. If your account enforces ECS tagging authorization, the ECS task execution role may additionally need `ecs:TagResource`.
 
 ## Coordinator Mode
 
