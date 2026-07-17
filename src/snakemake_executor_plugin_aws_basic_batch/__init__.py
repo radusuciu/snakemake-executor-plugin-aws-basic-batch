@@ -258,6 +258,7 @@ class Executor(RemoteExecutor):
         tags = self._parse_tags()
         if tags:
             submit_kwargs["tags"] = tags
+            submit_kwargs["propagateTags"] = True
 
         try:
             job_info = self.batch_client.submit_job(**submit_kwargs)
@@ -385,6 +386,7 @@ class Executor(RemoteExecutor):
         tags = self._parse_tags()
         if tags:
             submit_kwargs["tags"] = tags
+            submit_kwargs["propagateTags"] = True
 
         try:
             job_info = self.batch_client.submit_job(**submit_kwargs)
